@@ -1,24 +1,19 @@
-from fastapi import FastAPI
-from sqlmodel import SQLModel, Field, Session, create_engine, select
-
-class Item(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    name: str
-    price: int
-
-engine = create_engine("sqlite:///database.db")
-SQLModel.metadata.create_all(engine)
+from fastapi import FastAPI, HTTPException
+from sqlmodel import Session, select
+from database import engine, init_db
+from models import Item, ItemCreate
 
 app = FastAPI()
-
+init_db()
 @app.post("/items")
-def create_item(item: Item):
+def create_item(item: ItemCreate):
+    db_Item = Item(name=item.name, price=item.price)
     with Session(engine) as session:
-        session.add(item)
+        session.add(db_Item)
         session.commit()
-        session.refresh(item)
-        return item 
-    
+        session.refresh(db_Item)
+        return db_Item
+
 @app.get("/items")
 def get_items():
     with Session(engine) as session:
@@ -28,11 +23,15 @@ def get_items():
 def get_item(item_id: int):
     with Session(engine) as session:
         item = session.get(Item, item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
         return item
 @app.delete("/items/{item_id}")
 def delete_item(item_id: int):
     with Session(engine) as session:
         item = session.get(Item, item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
         session.delete(item)
         session.commit()
         return {"message": "Item deleted successfully"}
