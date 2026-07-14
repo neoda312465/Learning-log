@@ -1,19 +1,38 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from sqlmodel import SQLModel, Field, Session, create_engine, select
+
+class Item(SQLModel, table=True):
+    id: int = Field(default=None, primary_key=True)
+    name: str
+    price: int
+
+engine = create_engine("sqlite:///database.db")
+SQLModel.metadata.create_all(engine)
+
 app = FastAPI()
-@app.get("/")
-def home():
-    return {"message": "Hello, Neo!"}
 
-class person(BaseModel):
-    name:str
-    age: int
-@app.post("/greet")
-def greet(person: person):
-    return{"message": f"Hello {person.name} bhai, you are {person.age} years old! Wow, you are young!"}
-
-@app.get("/user/{user_id}")
-def get_user(user_id: int, verbose: bool = False):
-    if verbose:
-        return{"user_id": user_id, "detail": f"Full information about user {user_id}"}
-    return {"user_id": user_id}
+@app.post("/items")
+def create_item(item: Item):
+    with Session(engine) as session:
+        session.add(item)
+        session.commit()
+        session.refresh(item)
+        return item 
+    
+@app.get("/items")
+def get_items():
+    with Session(engine) as session:
+        items = session.exec(select(Item)).all()
+        return items
+@app.get("/items/{item_id}")
+def get_item(item_id: int):
+    with Session(engine) as session:
+        item = session.get(Item, item_id)
+        return item
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+    with Session(engine) as session:
+        item = session.get(Item, item_id)
+        session.delete(item)
+        session.commit()
+        return {"message": "Item deleted successfully"}
