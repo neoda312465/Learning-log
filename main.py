@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from sqlmodel import Session, select
 from database import engine, init_db
-from models import Item, ItemCreate
+from models import Item, ItemCreate, ItemUpdate
 
 app = FastAPI()
 init_db()
@@ -35,3 +35,17 @@ def delete_item(item_id: int):
         session.delete(item)
         session.commit()
         return {"message": "Item deleted successfully"}
+
+@app.put("/items/{item_id}")
+def update_item(item_id: int, item_update: ItemUpdate):
+    with Session(engine) as session:
+        db_item = session.get(Item, item_id)
+        if not db_item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        item_data = item_update.model_dump(exclude_unset=True)
+        for key, value in item_data.items():
+            setattr(db_item, key, value)
+        session.add(db_item)
+        session.commit()
+        return db_item
